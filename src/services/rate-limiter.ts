@@ -16,14 +16,41 @@ const RATE_LIMITS: Record<
 };
 
 // Track request counts per source per day
-const dailyCounts: Record<Source, { date: string; count: number }> = {
-  google_maps: { date: "", count: 0 },
-  website: { date: "", count: 0 },
-  linkedin: { date: "", count: 0 },
-  creci: { date: "", count: 0 },
-};
+type DailyCounts = Record<Source, { date: string; count: number }>;
+
+const STATE_FILE = "data/rate-limits.json";
 
 const getToday = (): string => new Date().toISOString().slice(0, 10);
+
+// Load persisted state
+const loadState = (): DailyCounts => {
+  try {
+    const file = Bun.file(STATE_FILE);
+    if (file.size > 0) {
+      const text = require("fs").readFileSync(STATE_FILE, "utf8");
+      return JSON.parse(text);
+    }
+  } catch {
+    // File doesn't exist or is invalid
+  }
+  return {
+    google_maps: { date: "", count: 0 },
+    website: { date: "", count: 0 },
+    linkedin: { date: "", count: 0 },
+    creci: { date: "", count: 0 },
+  };
+};
+
+// Save state to disk
+const saveState = (state: DailyCounts): void => {
+  try {
+    require("fs").writeFileSync(STATE_FILE, JSON.stringify(state, null, 2));
+  } catch (e) {
+    log.warn({ error: e }, "failed to save rate limit state");
+  }
+};
+
+const dailyCounts: DailyCounts = loadState();
 
 const resetDailyCountIfNeeded = (source: Source): void => {
   const today = getToday();
@@ -47,6 +74,7 @@ export const canMakeRequest = (source: Source): boolean => {
 export const recordRequest = (source: Source): void => {
   resetDailyCountIfNeeded(source);
   dailyCounts[source].count++;
+  saveState(dailyCounts);
 };
 
 export const getRandomDelay = (source: Source): number => {

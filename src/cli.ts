@@ -174,13 +174,85 @@ program
   .command("export")
   .description("Export leads to Excel")
   .option("-o, --output <path>", "Output file path", "leads.xlsx")
+  .option("-f, --format <format>", "Output format: xlsx or csv", "xlsx")
   .action(async (options) => {
     const db = initDatabase();
     try {
-      const result = await exportToExcel(db, options.output);
-      console.log(`\nExported to ${options.output}`);
+      const outputPath = options.format === "csv"
+        ? options.output.replace(/\.xlsx$/, ".csv")
+        : options.output;
+      const result = await exportToExcel(db, outputPath);
+      console.log(`\nExported to ${outputPath}`);
       console.log(`  Leads: ${result.leadCount}`);
       console.log(`  Interactions: ${result.interactionCount}`);
+    } finally {
+      closeDatabase(db);
+    }
+  });
+
+// Import command
+program
+  .command("import <file>")
+  .description("Import leads from Excel or CSV")
+  .option("--allow-duplicates", "Import even if company already exists")
+  .action(async (file, options) => {
+    const { importFromExcel } = await import("./import/excel");
+    const db = initDatabase();
+    try {
+      const result = await importFromExcel(db, file, {
+        skipDuplicates: !options.allowDuplicates,
+      });
+      console.log(`\nImport complete:`);
+      console.log(`  Total rows: ${result.totalRows}`);
+      console.log(`  Imported: ${result.imported}`);
+      console.log(`  Duplicates skipped: ${result.duplicates}`);
+      console.log(`  Skipped (no name): ${result.skipped}`);
+      if (result.errors.length > 0) {
+        console.log(`  Errors: ${result.errors.length}`);
+        for (const err of result.errors.slice(0, 5)) {
+          console.log(`    Row ${err.row}: ${err.error}`);
+        }
+        if (result.errors.length > 5) {
+          console.log(`    ... and ${result.errors.length - 5} more`);
+        }
+      }
+    } finally {
+      closeDatabase(db);
+    }
+  });
+
+// Sync command
+program
+  .command("sync <file>")
+  .description("Sync CRM changes from Excel back to database")
+  .option("--dry-run", "Show changes without applying them")
+  .option("--add-new", "Add new companies that don't exist in DB")
+  .action(async (file, options) => {
+    const { syncFromExcel } = await import("./sync/excel");
+    const db = initDatabase();
+    try {
+      const result = await syncFromExcel(db, file, {
+        dryRun: options.dryRun,
+        addNew: options.addNew,
+      });
+      console.log(`\nSync ${options.dryRun ? "(dry run)" : "complete"}:`);
+      console.log(`  Total rows: ${result.totalRows}`);
+      console.log(`  Synced: ${result.synced}`);
+      console.log(`  Unchanged: ${result.unchanged}`);
+      console.log(`  Not found in DB: ${result.notFound}`);
+      if (result.added > 0) {
+        console.log(`  Added new: ${result.added}`);
+      }
+      if (result.changes.length > 0) {
+        console.log(`\nChanges:`);
+        for (const change of result.changes.slice(0, 10)) {
+          console.log(`  ${change.companyName}: ${change.field}`);
+          console.log(`    "${change.oldValue}" → "${change.newValue}"`);
+        }
+        if (result.changes.length > 10) {
+          console.log(`  ... and ${result.changes.length - 10} more`);
+        }
+      }
     } finally {
       closeDatabase(db);
     }
@@ -279,6 +351,16 @@ program
     } finally {
       closeDatabase(db);
     }
+  });
+
+// Serve command - API for browser extension
+program
+  .command("serve")
+  .description("Start API server for browser extension enrichment")
+  .option("-p, --port <number>", "Port to listen on", "3000")
+  .action(async (options) => {
+    const { startServer } = await import("./server");
+    startServer(parseInt(options.port));
   });
 
 program.parse();

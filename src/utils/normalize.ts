@@ -51,16 +51,29 @@ export const extractDomain = (url: string): string | null => {
 };
 
 export const normalizeLinkedInUrl = (url: string): string => {
+  if (!url) return url;
+
+  const trimmed = url.trim();
+
+  // Handle short format like "/in/username" or "in/username"
+  if (!trimmed.includes("://")) {
+    const match = trimmed.match(/^\/?(?:in|company)\/([^/]+)/);
+    if (match) {
+      const type = trimmed.includes("company") ? "company" : "in";
+      return `https://www.linkedin.com/${type}/${match[1]}`;
+    }
+  }
+
   try {
-    const parsed = new URL(url);
+    const parsed = new URL(trimmed);
     // Standardize LinkedIn URLs
     const match = parsed.pathname.match(/\/(in|company)\/([^/]+)/);
     if (match) {
-      return `https://www.linkedin.com/${match[1]}/${match[2]}`;
+      return `https://www.linkedin.com/${match[1]}/${match[2].toLowerCase()}`;
     }
-    return url;
+    return trimmed;
   } catch {
-    return url;
+    return trimmed;
   }
 };
 

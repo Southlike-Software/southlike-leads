@@ -64,6 +64,15 @@ export const updateCompany = (
   stmt.run(values);
 };
 
+export const findCompanyById = (
+  db: Database,
+  id: string
+): Company | null => {
+  const stmt = db.prepare(`SELECT * FROM companies WHERE id = ?`);
+  const result = stmt.get(id) as Company | null;
+  return result ? { ...result, creci_verified: !!result.creci_verified } : null;
+};
+
 export const findCompanyByGooglePlaceId = (
   db: Database,
   placeId: string

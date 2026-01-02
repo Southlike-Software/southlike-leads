@@ -154,7 +154,8 @@ export const exportToExcel = async (
   db: Database,
   outputPath: string
 ): Promise<{ leadCount: number; interactionCount: number }> => {
-  log.info({ outputPath }, "starting Excel export");
+  const isCsv = outputPath.toLowerCase().endsWith(".csv");
+  log.info({ outputPath, format: isCsv ? "csv" : "xlsx" }, "starting export");
 
   const leads = getExportLeads(db);
   const interactions = getAllInteractions(db) as InteractionWithNames[];
@@ -167,7 +168,7 @@ export const exportToExcel = async (
   const leadsData = formatLeadsSheet(leads);
   const leadsSheet = XLSX.utils.aoa_to_sheet(leadsData);
 
-  // Set column widths
+  // Set column widths (ignored for CSV but useful for xlsx)
   leadsSheet["!cols"] = [
     { wch: 30 }, // Empresa
     { wch: 40 }, // Endereço
@@ -194,27 +195,33 @@ export const exportToExcel = async (
 
   XLSX.utils.book_append_sheet(workbook, leadsSheet, "Leads");
 
-  // Tab 2: Interactions
-  const interactionsData = formatInteractionsSheet(interactions);
-  const interactionsSheet = XLSX.utils.aoa_to_sheet(interactionsData);
-  interactionsSheet["!cols"] = [
-    { wch: 18 }, // Data
-    { wch: 30 }, // Empresa
-    { wch: 25 }, // Decisor
-    { wch: 12 }, // Tipo
-    { wch: 50 }, // Notas
-    { wch: 30 }, // Resultado
-  ];
-  XLSX.utils.book_append_sheet(workbook, interactionsSheet, "Interações");
+  // For CSV, only export Leads sheet
+  if (isCsv) {
+    const csvContent = XLSX.utils.sheet_to_csv(leadsSheet, { FS: ";" });
+    await Bun.write(outputPath, csvContent);
+  } else {
+    // Tab 2: Interactions
+    const interactionsData = formatInteractionsSheet(interactions);
+    const interactionsSheet = XLSX.utils.aoa_to_sheet(interactionsData);
+    interactionsSheet["!cols"] = [
+      { wch: 18 }, // Data
+      { wch: 30 }, // Empresa
+      { wch: 25 }, // Decisor
+      { wch: 12 }, // Tipo
+      { wch: 50 }, // Notas
+      { wch: 30 }, // Resultado
+    ];
+    XLSX.utils.book_append_sheet(workbook, interactionsSheet, "Interações");
 
-  // Tab 3: Dashboard
-  const dashboardData = formatDashboardSheet(stats);
-  const dashboardSheet = XLSX.utils.aoa_to_sheet(dashboardData);
-  dashboardSheet["!cols"] = [{ wch: 25 }, { wch: 15 }];
-  XLSX.utils.book_append_sheet(workbook, dashboardSheet, "Dashboard");
+    // Tab 3: Dashboard
+    const dashboardData = formatDashboardSheet(stats);
+    const dashboardSheet = XLSX.utils.aoa_to_sheet(dashboardData);
+    dashboardSheet["!cols"] = [{ wch: 25 }, { wch: 15 }];
+    XLSX.utils.book_append_sheet(workbook, dashboardSheet, "Dashboard");
 
-  // Write file
-  XLSX.writeFile(workbook, outputPath);
+    // Write xlsx file
+    XLSX.writeFile(workbook, outputPath);
+  }
 
   log.info(
     {
@@ -222,7 +229,7 @@ export const exportToExcel = async (
       leadCount: leads.length,
       interactionCount: interactions.length,
     },
-    "Excel export complete"
+    "export complete"
   );
 
   return {

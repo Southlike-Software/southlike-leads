@@ -8,6 +8,9 @@
     "cli": "bun run src/cli.ts",
     "collect": "bun run src/cli.ts collect",
     "export": "bun run src/cli.ts export",
+    "import": "bun run src/cli.ts import",
+    "sync": "bun run src/cli.ts sync",
+    "serve": "bun run src/cli.ts serve",
     "stats": "bun run src/cli.ts stats",
     "postinstall": "bunx playwright install chromium"
   },
@@ -24,6 +27,7 @@
     "pino": "^10.1.0",
     "pino-pretty": "^13.1.3",
     "playwright": "^1.57.0",
+    "real-require": "^0.2.0",
     "xlsx": "^0.18.5",
     "zod": "^4.1.13"
   }
