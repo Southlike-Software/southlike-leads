@@ -115,7 +115,7 @@ export const scrapeGoogleMaps = async (
   const seenPlaceIds = new Set<string>();
 
   for (const query of SEARCH_QUERIES) {
-    if (totalFetched >= limit) break;
+    if (newCount >= limit) break;
 
     log.info({ query }, "searching Google Maps");
 
@@ -129,10 +129,13 @@ export const scrapeGoogleMaps = async (
           if (seenPlaceIds.has(place.place_id)) continue;
           seenPlaceIds.add(place.place_id);
           const result = await processPlace(db, place);
-          if (result === "new") newCount++;
-          else if (result === "updated") updatedCount++;
+          if (result === "new") {
+            newCount++;
+            if (newCount >= limit) break;
+          } else if (result === "updated") {
+            updatedCount++;
+          }
           totalFetched++;
-          if (totalFetched >= limit) break;
         }
         continue;
       }
@@ -171,10 +174,13 @@ export const scrapeGoogleMaps = async (
         if (seenPlaceIds.has(place.place_id)) continue;
         seenPlaceIds.add(place.place_id);
         const result = await processPlace(db, place);
-        if (result === "new") newCount++;
-        else if (result === "updated") updatedCount++;
+        if (result === "new") {
+          newCount++;
+          if (newCount >= limit) break;
+        } else if (result === "updated") {
+          updatedCount++;
+        }
         totalFetched++;
-        if (totalFetched >= limit) break;
       }
     } catch (error) {
       log.error({ query, error }, "failed to search places");
